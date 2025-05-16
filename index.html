@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>整理券管理（運営側）</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 2rem;
+      font-family: "Noto Serif JP", serif;
+      background: #111;
+      color: #FFF;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .ticket-admin {
+      background: #222;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      display: grid;
+      grid-template-columns: auto repeat(3, min-content) 1fr min-content;
+      grid-gap: 0.5rem;
+      align-items: center;
+    }
+    .ticket-admin h2 {
+      margin: 0;
+      font-size: 1.2rem;
+      grid-column: 1 / 2;
+    }
+    .ticket-admin .btn-decrease,
+    .ticket-admin .btn-increase,
+    .ticket-admin .btn-set {
+      background: #1a73e8;
+      color: #FFF;
+      border: none;
+      border-radius: 4px;
+      padding: 0.5rem;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    .ticket-admin .btn-decrease:hover,
+    .ticket-admin .btn-increase:hover,
+    .ticket-admin .btn-set:hover {
+      background: #1558b0;
+    }
+    .ticket-admin .number {
+      font-size: 1.5rem;
+      font-weight: bold;
+      margin: 0 1rem;
+      min-width: 3rem;
+      text-align: center;
+    }
+    .ticket-admin input[type="number"] {
+      width: 4rem;
+      padding: 0.3rem;
+      border-radius: 4px;
+      border: none;
+      text-align: center;
+      background: #333;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>整理券番号 管理画面</h1>
+
+  <!-- カジノ -->
+  <div class="ticket-admin" id="admin-casino">
+    <h2>カジノトランプ</h2>
+    <button class="btn-decrease" id="dec-casino">−</button>
+    <p class="number" id="num-casino">--</p>
+    <button class="btn-increase" id="inc-casino">＋</button>
+    <input type="number" id="input-casino" placeholder="番号">
+    <button class="btn-set" id="set-casino">設定</button>
+  </div>
+
+  <!-- ダーツ -->
+  <div class="ticket-admin" id="admin-darts">
+    <h2>ダーツ</h2>
+    <button class="btn-decrease" id="dec-darts">−</button>
+    <p class="number" id="num-darts">--</p>
+    <button class="btn-increase" id="inc-darts">＋</button>
+    <input type="number" id="input-darts" placeholder="番号">
+    <button class="btn-set" id="set-darts">設定</button>
+  </div>
+
+  <!-- 麻雀 -->
+  <div class="ticket-admin" id="admin-mahjong">
+    <h2>麻雀</h2>
+    <button class="btn-decrease" id="dec-mahjong">−</button>
+    <p class="number" id="num-mahjong">--</p>
+    <button class="btn-increase" id="inc-mahjong">＋</button>
+    <input type="number" id="input-mahjong" placeholder="番号">
+    <button class="btn-set" id="set-mahjong">設定</button>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-database-compat.js"></script>
+  <script>
+    // Firebase 初期化
+    const firebaseConfig = {
+      apiKey: "AIzaSyD61hQI08c8ZiIUs-HiRKLHVl3DeTaFmSA",
+      authDomain: "togensai-92cb8.firebaseapp.com",
+      databaseURL: "https://togensai-92cb8-default-rtdb.firebaseio.com",
+      projectId: "togensai-92cb8",
+      storageBucket: "togensai-92cb8.appspot.com",
+      messagingSenderId: "98670394706",
+      appId: "1:98670394706:web:b9f9ce966cbccf1f61ce8b"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // 参照ノードをまとめる
+    const ticketsRef = {
+      mahjong: db.ref('tickets/mahjong'),
+      casino:  db.ref('tickets/casino'),
+      darts:   db.ref('tickets/darts')
+    };
+
+    // 要素キャッシュ
+    const elems = {
+      mahjong: {
+        num:   document.getElementById('num-mahjong'),
+        dec:   document.getElementById('dec-mahjong'),
+        inc:   document.getElementById('inc-mahjong'),
+        input: document.getElementById('input-mahjong'),
+        set:   document.getElementById('set-mahjong')
+      },
+      casino: {
+        num:   document.getElementById('num-casino'),
+        dec:   document.getElementById('dec-casino'),
+        inc:   document.getElementById('inc-casino'),
+        input: document.getElementById('input-casino'),
+        set:   document.getElementById('set-casino')
+      },
+      darts: {
+        num:   document.getElementById('num-darts'),
+        dec:   document.getElementById('dec-darts'),
+        inc:   document.getElementById('inc-darts'),
+        input: document.getElementById('input-darts'),
+        set:   document.getElementById('set-darts')
+      }
+    };
+
+    // リアルタイム監視＆表示更新
+    Object.entries(ticketsRef).forEach(([key, ref]) => {
+      ref.on('value', snapshot => {
+        const val = snapshot.val();
+        elems[key].num.textContent =
+          val !== null ? val : '未発行';
+      });
+    });
+
+    // 増減＆設定処理
+    Object.entries(ticketsRef).forEach(([key, ref]) => {
+      // インクリメント
+      elems[key].inc.addEventListener('click', () => {
+        ref.transaction(current => {
+          return (typeof current === 'number' ? current : 0) + 1;
+        });
+      });
+      // デクリメント
+      elems[key].dec.addEventListener('click', () => {
+        ref.transaction(current => {
+          return (typeof current === 'number' ? current : 0) - 1;
+        });
+      });
+      // 入力による設定
+      elems[key].set.addEventListener('click', () => {
+        const v = parseInt(elems[key].input.value, 10);
+        if (!isNaN(v)) {
+          ref.set(v);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
